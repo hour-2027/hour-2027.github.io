@@ -39,7 +39,7 @@ header nav,.menu-btn,.panel h3,.calendar-head h3,.cta,.cal-grid .today{font-weig
   .hero-stage.scroll-zoom::after{content:'';display:block;height:52svh;pointer-events:none;}
   .scroll-zoom .hero-pin{position:sticky;top:0;}
   .scroll-zoom .hero{min-height:100svh;background:var(--green);transform:scale(var(--hero-scale,1));transform-origin:50% 50%;border-radius:var(--hero-radius,0px);outline:1px solid rgba(255,255,255,var(--hero-edge,0));outline-offset:-1px;}
-  @media(max-width:760px){.hero-stage.scroll-zoom::after{height:38svh;}}
+  @media(max-width:760px){.hero-stage.scroll-zoom::after{height:48svh;}}
 }
 
 
@@ -64,6 +64,31 @@ header nav a{display:inline-block;transition:transform .25s ease;}
   .work:hover,.work:focus-visible{scale:1;}
   .work:hover svg{transform:none;}
   .overlay a:hover{padding-left:0;transform:none;}
+}
+
+
+/* Touch feedback: use a real press, not simulated hover. */
+@media (hover:none), (pointer:coarse){
+  .work{touch-action:pan-y pinch-zoom;-webkit-tap-highlight-color:transparent;}
+  .work:hover .visual:after{opacity:0;}
+  .work:hover b{transform:none;}
+  .work.touch-pressed .visual,.work:active .visual{border-color:#ffffffb0;box-shadow:0 10px 25px #00000025;}
+  .work.touch-pressed .visual:after,.work:active .visual:after{opacity:.10;}
+  .overlay a,.round,.menu-btn{touch-action:manipulation;}
+}
+@media (prefers-reduced-motion:no-preference){
+  .work.touch-pressed,.work:active{scale:1.045;z-index:2;}
+  .work.touch-pressed svg,.work:active svg{transform:scale(1.13);}
+  .work.touch-pressed b,.work:active b{transform:translate(3px,-3px);}
+  .overlay a.touch-pressed,.overlay a:active{transform:scale(1.025);}
+  .round.touch-pressed,.round:active{transform:scale(1.09);background:white;color:var(--green);}
+  .menu-btn.touch-pressed,.menu-btn:active{transform:scale(1.06);}
+  .round,.menu-btn{transition:transform .2s,background .25s,color .25s;}
+}
+@media(max-width:760px) and (prefers-reduced-motion:no-preference){
+  .scroll-zoom .hero{min-height:100vh;min-height:100svh;}
+  .hero-stage.scroll-zoom::after{height:48vh;height:48svh;}
+  .work.touch-pressed,.work:active{scale:1.045;}
 }
 
 </style></head>
@@ -101,18 +126,40 @@ const motion=matchMedia('(prefers-reduced-motion: reduce)'),mobile=matchMedia('(
 let zoomFrame=0;
 function updateHero(){
   zoomFrame=0;
-  if(motion.matches){stage.classList.remove('scroll-zoom');hero.style.removeProperty('--shift');return;}
+  if(motion.matches){stage.classList.remove('scroll-zoom');for(const key of ['--hero-scale','--hero-radius','--hero-edge','--shift'])hero.style.removeProperty(key);return;}
   const travel=Math.max(1,stage.offsetHeight-pin.offsetHeight);
   const progress=Math.max(0,Math.min(1,-stage.getBoundingClientRect().top/travel));
   const eased=progress*progress*(3-2*progress);
-  hero.style.setProperty('--hero-scale',(1-(mobile.matches?.10:.18)*eased).toFixed(4));
+  hero.style.setProperty('--hero-scale',(1-(mobile.matches?.20:.18)*eased).toFixed(4));
   hero.style.setProperty('--hero-radius',(eased*(mobile.matches?22:38)).toFixed(2)+'px');
   hero.style.setProperty('--hero-edge',(eased*.24).toFixed(3));
   hero.style.setProperty('--shift',(eased*hero.offsetHeight*.065).toFixed(2)+'px');
 }
 function scheduleHero(){if(!zoomFrame)zoomFrame=requestAnimationFrame(updateHero);}
 function syncMotion(){stage.classList.toggle('scroll-zoom',!motion.matches);scheduleHero();}
-window.addEventListener('scroll',scheduleHero,{passive:true});window.addEventListener('resize',scheduleHero,{passive:true});motion.addEventListener('change',syncMotion);syncMotion();
+window.addEventListener('scroll',scheduleHero,{passive:true});window.addEventListener('resize',scheduleHero,{passive:true});if(motion.addEventListener)motion.addEventListener('change',syncMotion);else if(motion.addListener)motion.addListener(syncMotion);if(window.visualViewport)window.visualViewport.addEventListener('resize',scheduleHero,{passive:true});syncMotion();
+
+// Touch feedback without blocking scrolling or native link navigation.
+const touchTargets=document.querySelectorAll('.work,.overlay a,.round,.menu-btn');
+for(const target of touchTargets){
+  let pointer=null,startX=0,startY=0,releaseTimer=0;
+  const clearPress=()=>{clearTimeout(releaseTimer);target.classList.remove('touch-pressed');pointer=null;};
+  target.addEventListener('pointerdown',e=>{
+    if(e.pointerType!=='touch'&&e.pointerType!=='pen')return;
+    clearPress();pointer=e.pointerId;startX=e.clientX;startY=e.clientY;
+    target.classList.add('touch-pressed');
+  },{passive:true});
+  target.addEventListener('pointermove',e=>{
+    if(e.pointerId===pointer&&Math.hypot(e.clientX-startX,e.clientY-startY)>10)clearPress();
+  },{passive:true});
+  target.addEventListener('pointercancel',clearPress,{passive:true});
+  target.addEventListener('pointerup',e=>{
+    if(e.pointerId!==pointer)return;
+    pointer=null;releaseTimer=setTimeout(clearPress,150);
+  },{passive:true});
+  target.addEventListener('contextmenu',clearPress);
+}
+
 let year=2027,month=0;const grid=document.getElementById('calGrid');function renderCalendar(){document.getElementById('monthLabel').textContent=`${year}년 ${month+1}월`;grid.replaceChildren();const add=(t,c)=>{const s=document.createElement('span');s.textContent=t;if(c)s.className=c;grid.append(s)};['일','월','화','수','목','금','토'].forEach(d=>add(d,'dayname'));let first=new Date(year,month,1).getDay(),last=new Date(year,month+1,0).getDate(),today=new Date();for(let i=0;i<first;i++)add('');for(let d=1;d<=last;d++)add(d,today.getFullYear()===year&&today.getMonth()===month&&today.getDate()===d?'today':'');for(let i=(first+last)%7;i>0&&i<7;i++)add('')}function moveMonth(n){const d=new Date(year,month+n,1);year=d.getFullYear();month=d.getMonth();renderCalendar()}document.getElementById('monthPrev').onclick=()=>moveMonth(-1);document.getElementById('monthNext').onclick=()=>moveMonth(1);renderCalendar();
 </script><script>
 if(new URLSearchParams(location.search).has('fontcheck')){
