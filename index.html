@@ -235,6 +235,21 @@ header nav,.menu-btn,.cta,.demo-action,.hour-admin-button,.demo-expand>summary,.
 @media(max-width:760px){#members .leadership-people{grid-template-columns:repeat(4,minmax(0,1fr));gap:24px 14px;margin-top:12px}#members .leadership-person:nth-child(4){grid-column:span 2}#members .leadership-person:nth-child(5){grid-column:2/span 2}#members .leadership-label{min-height:52px;gap:.3em;padding:11px 4px}#members .leadership-person small{font-size:12px}#members .leadership-person h3{font-size:clamp(17px,4.5vw,23px)}}
 @media(prefers-reduced-motion:reduce){#members .leadership-person,#members .leadership-avatar img{transition:none!important;transform:none!important}}
 </style>
+<style id="hour-profile-motion">
+#members .leadership-people{row-gap:clamp(42px,6vw,78px);padding-top:clamp(18px,3vw,36px)}
+#members .leadership-person{cursor:pointer;touch-action:pan-y;-webkit-tap-highlight-color:transparent;transform:none!important;overflow:visible}
+#members .leadership-avatar{overflow:visible;clip-path:inset(-25% -15% 0 -15%)}
+/* The exact existing portrait remains visible for the entire interaction. */
+#members .leadership-avatar img:not(.hour-wave-arm){opacity:1!important;transform:none!important;transition:transform .32s cubic-bezier(.2,.75,.25,1)}
+#members .leadership-person.is-greeting .leadership-avatar img:not(.hour-wave-arm){transform:scale(1.055)!important}
+#members .leadership-avatar img.hour-wave-arm{position:absolute;z-index:2;left:var(--arm-x,-3%);right:auto;bottom:0;top:auto;width:var(--arm-w,35%);height:auto;max-width:none;object-fit:contain;opacity:0;pointer-events:none;transform-origin:45% 96%;transform:translateY(110%) rotate(-22deg);transition:none}
+#members .leadership-person.is-greeting{z-index:3}
+#members .leadership-person.is-greeting .hour-wave-arm{animation:hourArmHello 1.7s both}
+@keyframes hourArmHello{0%{opacity:0;transform:translateY(100%) rotate(-22deg)}10%{opacity:1}24%{opacity:1;transform:translateY(0) rotate(-7deg);animation-timing-function:ease-in-out}37%{transform:translateY(0) rotate(4deg);animation-timing-function:ease-in-out}49%{transform:translateY(0) rotate(-9deg);animation-timing-function:ease-in-out}61%{transform:translateY(0) rotate(4deg);animation-timing-function:ease-in-out}73%{opacity:1;transform:translateY(0) rotate(-7deg);animation-timing-function:ease-in}94%{opacity:1}100%{opacity:0;transform:translateY(100%) rotate(-22deg)}}
+#members .leadership-person:focus-visible{outline:2px solid #d9efca;outline-offset:5px}
+@media(max-width:760px){#members .leadership-people{row-gap:clamp(35px,9vw,62px);padding-top:15px;column-gap:18px}#members .leadership-avatar{clip-path:inset(-25% -13% 0 -13%)}}
+@media(prefers-reduced-motion:reduce){#members .leadership-avatar img:not(.hour-wave-arm){transition:none!important;transform:none!important}#members .leadership-person.is-greeting .leadership-avatar img:not(.hour-wave-arm){transform:none!important}#members .leadership-person.is-greeting .hour-wave-arm{animation:none;opacity:1;transform:none}}
+</style>
 </head>
 <body><div aria-hidden="true" class="loader"><div class="loader-logo"><img alt="" src="assets/hour-logo.png"/></div><div class="loader-line"><i></i></div><div class="loader-caption"><span>H:OUR / 2027</span><span data-percent="">0%</span></div></div><div aria-hidden="true" class="scene-progress"></div><header><a aria-label="H:OUR 홈" class="brand" href="#top">H:OUR</a><nav aria-label="주요 메뉴"><a href="#notice">공지</a>
 <a href="#feedback">건의</a>
@@ -571,5 +586,34 @@ refreshPhotos();
 refreshPublic();
 })();
 
+</script>
+<script id="hour-profile-motion-script">
+(() => {
+ const cards=[...document.querySelectorAll('#members .leadership-person')];
+ const reduce=matchMedia('(prefers-reduced-motion: reduce)');
+ const placement=[[36.25,-2.5],[35.5,-3],[33.75,-5.25],[34.5,-3.5],[34.25,-3.75]];
+ let active=null, serial=0, timer=0;
+ function stop(){++serial;clearTimeout(timer);if(active)active.classList.remove('is-greeting');active=null;}
+ async function greet(card){
+   if(active===card)return;
+   stop();active=card;const token=serial;
+   try{await card.armReady;}catch{if(token===serial)stop();return;}
+   if(token!==serial)return;
+   card.classList.add('is-greeting');
+   timer=setTimeout(()=>{if(token===serial)stop()},reduce.matches?950:1700);
+ }
+ cards.forEach((card,i)=>{
+   const avatar=card.querySelector('.leadership-avatar'), still=avatar.querySelector('img');
+   if(!still)return;
+   const arm=new Image();arm.className='hour-wave-arm';arm.alt='';arm.setAttribute('aria-hidden','true');arm.draggable=false;
+   const [w,x]=placement[i]||[35,-3];card.style.setProperty('--arm-w',w+'%');card.style.setProperty('--arm-x',x+'%');
+   card.armReady=new Promise((resolve,reject)=>{arm.onload=resolve;arm.onerror=reject;});card.armReady.catch(()=>{});
+   arm.src=still.getAttribute('src').replace('-cutout.webp','-arm.webp')+'?v=2';avatar.append(arm);
+   card.tabIndex=0;card.setAttribute('role','button');card.setAttribute('aria-label',card.querySelector('.leadership-label').textContent.trim().replace(/\s+/g,' ')+' 손 인사 애니메이션');
+   card.addEventListener('pointerenter',e=>{if(e.pointerType==='mouse'||e.pointerType==='pen')greet(card)});
+   card.addEventListener('click',()=>greet(card));
+   card.addEventListener('keydown',e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();greet(card)}});
+ });
+})();
 </script>
 </body></html>
